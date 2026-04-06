@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Becca & Brian • Japan Itinerary Map</title>
+  <title>Japan Travel Recommendations</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
@@ -20,13 +20,47 @@
     header {
       padding: 14px 24px;
       background: #111;
-      border-bottom: 1px solid #222;
+      border-bottom: 1px solid #1e1e1e;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-shrink: 0;
       gap: 16px;
     }
+
+    .filter-bar {
+      padding: 8px 24px;
+      background: #111;
+      border-bottom: 1px solid #222;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .filter-bar::-webkit-scrollbar { display: none; }
+    .filter-label {
+      font-size: 11px;
+      color: #444;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      flex-shrink: 0;
+      margin-right: 2px;
+    }
+    .cat-pill {
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid #2a2a2a;
+      background: transparent;
+      color: #888;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .cat-pill:hover { border-color: #444; color: #ccc; }
+    .cat-pill.active { background: #fff; color: #000; border-color: #fff; }
 
     .header-left h1 {
       font-size: 17px;
@@ -205,8 +239,8 @@
 
 <header>
   <div class="header-left">
-    <h1>Becca &amp; Brian &nbsp;·&nbsp; Japan</h1>
-    <p>Apr 4 – 18, 2026 &nbsp;·&nbsp; 40 locations across 5 regions</p>
+    <h1>Japan &nbsp;·&nbsp; Travel Recommendations</h1>
+    <p>40 curated locations across 5 regions</p>
   </div>
   <div class="legend">
     <div class="legend-item" onclick="filterRegion('tokyo')">
@@ -229,6 +263,23 @@
     </div>
   </div>
 </header>
+
+<div class="filter-bar">
+  <span class="filter-label">Category</span>
+  <div class="cat-pill active" onclick="filterCategory(null, this)">All</div>
+  <div class="cat-pill" onclick="filterCategory('Hotel', this)">🏨 Hotels</div>
+  <div class="cat-pill" onclick="filterCategory('Temple', this)">⛩ Temples</div>
+  <div class="cat-pill" onclick="filterCategory('Shrine', this)">⛩ Shrines</div>
+  <div class="cat-pill" onclick="filterCategory('Neighborhood', this)">🗺 Neighborhoods</div>
+  <div class="cat-pill" onclick="filterCategory('Restaurant', this)">🍣 Restaurants</div>
+  <div class="cat-pill" onclick="filterCategory('Market', this)">🛍 Markets</div>
+  <div class="cat-pill" onclick="filterCategory('Shopping', this)">🛍 Shopping</div>
+  <div class="cat-pill" onclick="filterCategory('Museum', this)">🖼 Museums</div>
+  <div class="cat-pill" onclick="filterCategory('Nature', this)">🌿 Nature</div>
+  <div class="cat-pill" onclick="filterCategory('Experience', this)">✨ Experiences</div>
+  <div class="cat-pill" onclick="filterCategory('Café', this)">☕ Cafés</div>
+  <div class="cat-pill" onclick="filterCategory('Park', this)">🌸 Parks</div>
+</div>
 
 <div id="map"></div>
 
@@ -615,7 +666,7 @@
         <div class="popup-badge" style="${badgeStyle}">${REGIONS[loc.region].label} · ${loc.category}</div>
         <div class="popup-name">${loc.name}${hotelFlag}</div>
         <div class="popup-desc">${loc.desc}</div>
-        <div class="popup-day">📅 ${loc.day}</div>
+        ${loc.tip ? `<div class="popup-day">💡 ${loc.tip}</div>` : ''}
       </div>`;
 
     const marker = L.marker([loc.lat, loc.lng], { icon: makeIcon(loc) })
@@ -628,11 +679,12 @@
   // ── SIDEBAR ───────────────────────────────────────────────────────────
   const sidebarEl = document.getElementById('sidebarList');
 
-  function buildSidebar(filter) {
+  function buildSidebar(regionFilter, catFilter) {
     sidebarEl.innerHTML = '';
     const grouped = {};
     LOCATIONS.forEach(loc => {
-      if (filter && loc.region !== filter) return;
+      if (regionFilter && loc.region !== regionFilter) return;
+      if (catFilter && loc.category !== catFilter) return;
       if (!grouped[loc.region]) grouped[loc.region] = [];
       grouped[loc.region].push(loc);
     });
@@ -654,7 +706,7 @@
           <div class="sidebar-dot ${loc.isHotel ? 'hotel' : ''}" style="background:${color}"></div>
           <div>
             <div class="sidebar-item-name">${loc.name}</div>
-            <div class="sidebar-item-meta">${loc.category} · ${loc.day}</div>
+            <div class="sidebar-item-meta">${loc.category}</div>
           </div>`;
         item.addEventListener('click', () => {
           map.setView([loc.lat, loc.lng], 15, { animate: true });
@@ -668,7 +720,7 @@
     });
   }
 
-  buildSidebar(null);
+  buildSidebar(null, null);
 
   // ── FILTER ────────────────────────────────────────────────────────────
   const REGION_VIEWS = {
@@ -679,19 +731,25 @@
     nikko:  { center: [36.7500, 139.4800], zoom: 13 }
   };
 
-  let activeFilter = null;
+  let activeRegion = null;
+  let activeCategory = null;
 
-  function filterRegion(region) {
-    activeFilter = region;
-    buildSidebar(region);
-
+  function applyFilters() {
     markers.forEach(({ loc, marker }) => {
-      if (!region || loc.region === region) {
+      const regionOk = !activeRegion || loc.region === activeRegion;
+      const catOk = !activeCategory || loc.category === activeCategory;
+      if (regionOk && catOk) {
         marker.addTo(map);
       } else {
         marker.remove();
       }
     });
+    buildSidebar(activeRegion, activeCategory);
+  }
+
+  function filterRegion(region) {
+    activeRegion = region;
+    applyFilters();
 
     if (region && REGION_VIEWS[region]) {
       const v = REGION_VIEWS[region];
@@ -700,7 +758,6 @@
       map.setView([35.8, 137.8], 7, { animate: true });
     }
 
-    // update legend highlights
     document.querySelectorAll('.legend-item').forEach(el => el.classList.remove('active'));
     if (region) {
       document.querySelectorAll('.legend-item').forEach(el => {
@@ -709,6 +766,13 @@
         }
       });
     }
+  }
+
+  function filterCategory(category, el) {
+    activeCategory = category;
+    document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
+    el.classList.add('active');
+    applyFilters();
   }
 </script>
 </body>
