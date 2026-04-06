@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Becca & Brian • Japan Itinerary Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d0d0d;
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 14px 24px;
+      background: #111;
+      border-bottom: 1px solid #222;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      gap: 16px;
+    }
+
+    .header-left h1 {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+    .header-left p {
+      font-size: 12px;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #999;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 20px;
+      transition: background 0.15s;
+    }
+    .legend-item:hover { background: #1e1e1e; }
+    .legend-item.active { background: #1e1e1e; color: #fff; }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .legend-square {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    #map { flex: 1; }
+
+    /* Sidebar panel */
+    .sidebar {
+      position: absolute;
+      top: 64px;
+      left: 12px;
+      width: 300px;
+      max-height: calc(100vh - 80px);
+      background: #111;
+      border: 1px solid #222;
+      border-radius: 12px;
+      z-index: 1000;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    .sidebar-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid #1e1e1e;
+      font-size: 12px;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .sidebar-list {
+      overflow-y: auto;
+      flex: 1;
+    }
+    .sidebar-list::-webkit-scrollbar { width: 4px; }
+    .sidebar-list::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-list::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+    .sidebar-item {
+      padding: 10px 14px;
+      border-bottom: 1px solid #1a1a1a;
+      cursor: pointer;
+      transition: background 0.1s;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .sidebar-item:hover { background: #161616; }
+    .sidebar-item:last-child { border-bottom: none; }
+
+    .sidebar-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+    .sidebar-dot.hotel {
+      border-radius: 2px;
+    }
+
+    .sidebar-item-name {
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.3;
+    }
+    .sidebar-item-meta {
+      font-size: 11px;
+      color: #555;
+      margin-top: 1px;
+    }
+
+    /* Popup styles */
+    .leaflet-popup-content-wrapper {
+      background: #1a1a1a !important;
+      color: #fff !important;
+      border: 1px solid #2a2a2a !important;
+      border-radius: 10px !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+    }
+    .leaflet-popup-content { margin: 0 !important; }
+    .leaflet-popup-tip { background: #1a1a1a !important; }
+    .leaflet-popup-close-button { color: #555 !important; top: 8px !important; right: 8px !important; font-size: 18px !important; }
+    .leaflet-popup-close-button:hover { color: #fff !important; }
+
+    .popup-inner {
+      padding: 14px 16px;
+      min-width: 220px;
+      max-width: 280px;
+    }
+    .popup-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+    }
+    .popup-name {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+    .popup-desc {
+      font-size: 12px;
+      color: #999;
+      line-height: 1.6;
+    }
+    .popup-day {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #555;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Zoom controls */
+    .leaflet-control-zoom {
+      border: none !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4) !important;
+    }
+    .leaflet-control-zoom a {
+      background: #1a1a1a !important;
+      color: #fff !important;
+      border-color: #2a2a2a !important;
+    }
+    .leaflet-control-zoom a:hover { background: #222 !important; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Becca &amp; Brian &nbsp;·&nbsp; Japan</h1>
+    <p>Apr 4 – 18, 2026 &nbsp;·&nbsp; 40 locations across 5 regions</p>
+  </div>
+  <div class="legend">
+    <div class="legend-item" onclick="filterRegion('tokyo')">
+      <div class="legend-dot" style="background:#4A90E2"></div>Tokyo
+    </div>
+    <div class="legend-item" onclick="filterRegion('hakone')">
+      <div class="legend-dot" style="background:#2ecc71"></div>Hakone
+    </div>
+    <div class="legend-item" onclick="filterRegion('kyoto')">
+      <div class="legend-dot" style="background:#9b59b6"></div>Kyoto
+    </div>
+    <div class="legend-item" onclick="filterRegion('fuji')">
+      <div class="legend-dot" style="background:#e67e22"></div>Mt. Fuji
+    </div>
+    <div class="legend-item" onclick="filterRegion('nikko')">
+      <div class="legend-dot" style="background:#1abc9c"></div>Nikko
+    </div>
+    <div class="legend-item" onclick="filterRegion(null)" style="margin-left: 4px; color:#444;">
+      Show all
+    </div>
+  </div>
+</header>
+
+<div id="map"></div>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-header">All Locations</div>
+  <div class="sidebar-list" id="sidebarList"></div>
+</div>
+
+<script>
+  const REGIONS = {
+    tokyo:  { color: '#4A90E2', label: 'Tokyo' },
+    hakone: { color: '#2ecc71', label: 'Hakone' },
+    kyoto:  { color: '#9b59b6', label: 'Kyoto' },
+    fuji:   { color: '#e67e22', label: 'Mt. Fuji' },
+    nikko:  { color: '#1abc9c', label: 'Nikko' }
+  };
+
+  const LOCATIONS = [
+    // ── TOKYO ──────────────────────────────────────────────────────────
+    {
+      name: 'Park Hotel Tokyo',
+      lat: 35.6628, lng: 139.7596,
+      region: 'tokyo', category: 'Hotel', isHotel: true,
+      desc: 'Home base for 4 nights in Shiodome Media Tower. Each floor features unique Japanese contemporary art. Artist Room Queen.',
+      day: 'Apr 5–9'
+    },
+    {
+      name: 'Shinjuku',
+      lat: 35.6938, lng: 139.7034,
+      region: 'tokyo', category: 'Neighborhood',
+      desc: "Tokyo's best entertainment district at night. Visit Omoide Yokocho (Memory Lane), Shinjuku Golden Gai's intimate bars, and the illuminated Godzilla Head on the Toho Building. Try Bar Albatross or Deathmatch in Hell.",
+      day: 'Apr 5 evening (suggested)'
+    },
+    {
+      name: 'Yanesen District',
+      lat: 35.7269, lng: 139.7642,
+      region: 'tokyo', category: 'Neighborhood',
+      desc: 'Old Tokyo preserved from wartime destruction — traditional architecture, artisan shops, and sacred spaces. Starting point for the Context Travel day tour.',
+      day: 'Apr 6 (Context Travel tour)'
+    },
+    {
+      name: 'Ueno Park',
+      lat: 35.7146, lng: 139.7719,
+      region: 'tokyo', category: 'Park',
+      desc: 'Sprawling urban park with multiple museums, a zoo, shrines, and ponds. Famous for cherry blossom season. Part of the Context Travel day tour.',
+      day: 'Apr 6'
+    },
+    {
+      name: 'Senso-ji Temple, Asakusa',
+      lat: 35.7148, lng: 139.7967,
+      region: 'tokyo', category: 'Temple',
+      desc: "Tokyo's oldest temple. Nakamise Street lined with food stalls and souvenirs leads to the grand Kaminarimon gate. Spiritual highlight of the Context Travel day tour.",
+      day: 'Apr 6'
+    },
+    {
+      name: 'Ginza',
+      lat: 35.6717, lng: 139.7657,
+      region: 'tokyo', category: 'Shopping',
+      desc: "Tokyo's upmarket shopping district. Walk Chuo-dori for luxury brands, visit Itoya Stationery for high-end notebooks and art supplies, and explore Depachika basement food halls at Ginza Six & Mitsukoshi.",
+      day: 'Apr 6 afternoon (suggested)'
+    },
+    {
+      name: 'Sushi Take',
+      lat: 35.6680, lng: 139.7590,
+      region: 'tokyo', category: 'Restaurant',
+      desc: 'Dinner reservation (booked by Becca). Sushi restaurant in the Shiodome/Ginza area.',
+      day: 'Apr 6, 6:00 PM'
+    },
+    {
+      name: 'Sushi Making Class (Sasazuka)',
+      lat: 35.6707, lng: 139.6724,
+      region: 'tokyo', category: 'Experience',
+      desc: 'Private class with chef Akemi Castellano. Learn Edomae-style Tokyo sushi, prepare 4 types, eat together at her kitchen table. Meet her husband Dan at Sasazuka station. Booked through Context Travel.',
+      day: 'Apr 7, 10:30 AM'
+    },
+    {
+      name: 'teamLab Borderless',
+      lat: 35.6582, lng: 139.7439,
+      region: 'tokyo', category: 'Museum',
+      desc: 'Immersive digital art museum at Azabudai Hills. Suggested activity — purchase tickets in advance online.',
+      day: 'Apr 7 (suggested)'
+    },
+    {
+      name: 'Mori Art Museum & Tokyo City View',
+      lat: 35.6604, lng: 139.7292,
+      region: 'tokyo', category: 'Museum',
+      desc: 'Contemporary art museum on top floors of Roppongi Hills Mori Tower with sweeping city views. Tokyo City View observatory is especially beautiful at night.',
+      day: 'Apr 7 (suggested)'
+    },
+    {
+      name: 'Zojo-ji Temple',
+      lat: 35.6580, lng: 139.7454,
+      region: 'tokyo', category: 'Temple',
+      desc: 'Historic 14th-century Buddhist temple associated with the Tokugawa shogunate. Tokyo Tower rises dramatically behind the main hall.',
+      day: 'Apr 7 (suggested)'
+    },
+    {
+      name: 'Hie Shrine',
+      lat: 35.6742, lng: 139.7432,
+      region: 'tokyo', category: 'Shrine',
+      desc: 'Beautiful tunnel of vermilion torii gates climbing the hillside — reminiscent of Kyoto\'s Fushimi Inari. Dedicated to the guardian deity of Tokyo.',
+      day: 'Apr 7 (suggested)'
+    },
+    {
+      name: 'Daikanyama T-Site',
+      lat: 35.6493, lng: 139.7026,
+      region: 'tokyo', category: 'Shopping',
+      desc: '"The Brooklyn of Tokyo." Stunning bookstore complex with Anjin Library lounge (vintage 1960s magazines), Tsutaya Books, and Kameria luxury perfume bar. Stroll residential streets lined with indie boutiques.',
+      day: 'Apr 7 (suggested)'
+    },
+    {
+      name: 'Nakameguro & Meguro River',
+      lat: 35.6431, lng: 139.6985,
+      region: 'tokyo', category: 'Neighborhood',
+      desc: 'Trendy riverside neighborhood with indie shops and specialty coffee. Peaceful walk along the Meguro River, especially beautiful during cherry blossom season.',
+      day: 'Apr 7 (suggested)'
+    },
+    {
+      name: 'Tsukiji Outer Market',
+      lat: 35.6654, lng: 139.7706,
+      region: 'tokyo', category: 'Market',
+      desc: "Japan's famous seafood and street food market. Must-try: tuna nigiri, tamago (Japanese omelette), grilled unagi (eel). Arrive early to beat crowds.",
+      day: 'Apr 8 (suggested)'
+    },
+    {
+      name: 'Meiji Jingu Shrine',
+      lat: 35.6764, lng: 139.6993,
+      region: 'tokyo', category: 'Shrine',
+      desc: '175-acre forested Shinto shrine with 120,000 trees — an oasis of calm in the city. Built 1915–1920 to honor Emperor Meiji. Visit the serene Inner Garden and Kiyomasa\'s Well.',
+      day: 'Apr 8 (suggested)'
+    },
+    {
+      name: 'Harajuku & Takeshita Street',
+      lat: 35.6702, lng: 139.7027,
+      region: 'tokyo', category: 'Neighborhood',
+      desc: 'Famous for youth culture and kawaii fashion on Takeshita Street (marion crepes, quirky shops). Cat Street is more relaxed with indie and vintage stores. Vintage designer bags at Amore, KOMEHYO, Qoo, Paradise Vintage.',
+      day: 'Apr 8 (suggested)'
+    },
+    {
+      name: 'Omotesando',
+      lat: 35.6653, lng: 139.7129,
+      region: 'tokyo', category: 'Shopping',
+      desc: "Tokyo's Fifth Avenue — high-end designer boutiques (Dior, etc.) along the main tree-lined avenue. Endless small boutiques on side streets. Vintage bags at Casanova, Ragtag, Camellia.",
+      day: 'Apr 8 (suggested)'
+    },
+    {
+      name: 'Shibuya Night Food Tour',
+      lat: 35.6580, lng: 139.7016,
+      region: 'tokyo', category: 'Experience',
+      desc: 'Context Travel guided food tour. Meet at the Hachiko exit police box. Explore neon-lit Dogenzaka, local izakayas, Nonbei Yokocho (Drunkard\'s Alley), and a standing sushi bar. Purikura photo booth optional!',
+      day: 'Apr 8, 5:00 PM'
+    },
+
+    // ── HAKONE ─────────────────────────────────────────────────────────
+    {
+      name: 'Kinnotake Tonosawa Inn',
+      lat: 35.2355, lng: 139.1055,
+      region: 'hakone', category: 'Hotel', isHotel: true,
+      desc: 'Traditional ryokan with open-air onsen bath (Hikari Deluxe Room). Dinner served 5:30 or 7:30 PM; breakfast from 7:30 AM. 25 min by bus from Odawara Station.',
+      day: 'Apr 9–10'
+    },
+    {
+      name: 'Hakone Open Air Museum (Gora)',
+      lat: 35.2443, lng: 139.0629,
+      region: 'hakone', category: 'Museum',
+      desc: 'Outdoor sculpture museum in Gora with both indoor and outdoor exhibitions, cafés, and a foot bath. Take the Hakone Tozan Railway — Japan\'s oldest mountain railway — winding through the forested valley.',
+      day: 'Apr 9 (suggested)'
+    },
+    {
+      name: 'Owakudani Volcanic Valley',
+      lat: 35.2527, lng: 139.0198,
+      region: 'hakone', category: 'Nature',
+      desc: 'Active volcanic crater seen from the Hakone Ropeway 130m above. Sulfurous fumes, hot springs, and volcanic rivers. Try the famous black eggs (kuro-tamago) cooked in the hot spring pools — one egg adds 7 years to your life!',
+      day: 'Apr 9'
+    },
+    {
+      name: 'Lake Ashi (Ashinoko) Cruise',
+      lat: 35.2042, lng: 139.0235,
+      region: 'hakone', category: 'Nature',
+      desc: 'Scenic lake at the foot of Mt. Fuji. Take the sightseeing cruise from Togendai Station, reached via the Hakone Ropeway. On clear days, Mt. Fuji is perfectly reflected in the water.',
+      day: 'Apr 9'
+    },
+
+    // ── KYOTO ──────────────────────────────────────────────────────────
+    {
+      name: 'The Chapter Kyoto',
+      lat: 35.0115, lng: 135.7673,
+      region: 'kyoto', category: 'Hotel', isHotel: true,
+      desc: 'Boutique hotel inspired by Japanese tea ceremonies. 203 rooms with modern Japanese design, 24-hour fitness center, and a traditional Japanese public bath.',
+      day: 'Apr 10–14'
+    },
+    {
+      name: 'Gion & Yasaka Shrine',
+      lat: 35.0037, lng: 135.7779,
+      region: 'kyoto', category: 'Neighborhood',
+      desc: "Kyoto's historic geisha district with traditional machiya townhouses. Yasaka Shrine anchors the neighborhood. Starting point for the Context Travel Kyoto day tour.",
+      day: 'Apr 11'
+    },
+    {
+      name: 'Kiyomizu-dera Temple',
+      lat: 34.9948, lng: 135.7851,
+      region: 'kyoto', category: 'Temple',
+      desc: 'Iconic Buddhist temple perched high in the Kyoto hills with sweeping city views from its famous wooden stage. Part of the Context Travel Kyoto day tour.',
+      day: 'Apr 11'
+    },
+    {
+      name: 'Kennin-ji (Zen Temple)',
+      lat: 35.0001, lng: 135.7752,
+      region: 'kyoto', category: 'Temple',
+      desc: "Kyoto's oldest Zen Buddhist temple, near Gion. Famous for its dramatic ceiling painting of twin dragons and serene rock garden.",
+      day: 'Apr 11 (Context Travel tour)'
+    },
+    {
+      name: 'Nishiki Market',
+      lat: 35.0052, lng: 135.7655,
+      region: 'kyoto', category: 'Market',
+      desc: '"Kyoto\'s Kitchen" — a narrow five-block market street with 100+ shops selling fresh seafood, Japanese sweets, pickles, Kyoto specialties, and cookware. Lunch spot on the Context Travel tour.',
+      day: 'Apr 11 & 13'
+    },
+    {
+      name: 'Kinkaku-ji (Golden Pavilion)',
+      lat: 35.0394, lng: 135.7292,
+      region: 'kyoto', category: 'Temple',
+      desc: "Kyoto's most iconic landmark — a gold-leaf-covered pavilion perfectly reflected in a mirror pond. Part of the afternoon garden and temple tour with Context Travel.",
+      day: 'Apr 11'
+    },
+    {
+      name: 'Ryoan-ji Temple',
+      lat: 35.0345, lng: 135.7184,
+      region: 'kyoto', category: 'Temple',
+      desc: "Japan's most famous Zen rock garden — 15 stones arranged in raked gravel, a masterpiece of minimalist design. Part of the Context Travel suggested sites.",
+      day: 'Apr 11 (suggested)'
+    },
+    {
+      name: 'Ichikawaya Coffee',
+      lat: 35.0040, lng: 135.7791,
+      region: 'kyoto', category: 'Café',
+      desc: 'Suggested snack stop in Higashiyama. Order the famous fruit sando (fruit sandwich). Walk-ins only.',
+      day: 'Apr 11 (suggested)'
+    },
+    {
+      name: 'Izuju Sushi (いづ重)',
+      lat: 35.0037, lng: 135.7785,
+      region: 'kyoto', category: 'Restaurant',
+      desc: 'Beloved walk-in sushi restaurant in Gion. Known for pressed mackerel sushi (battera). Last order at 6:30 PM.',
+      day: 'Apr 11 (suggested)'
+    },
+    {
+      name: 'Fushimi Inari Taisha',
+      lat: 34.9671, lng: 135.7727,
+      region: 'kyoto', category: 'Shrine',
+      desc: "Kyoto's most iconic shrine. Thousands of vermilion torii gates wind up Mt. Inari. Full hike is 1.5–2 hrs round trip; Yotsutsuji viewpoint at 30 mins has stunning city views. Open 24 hrs — go at dawn for best photos.",
+      day: 'Apr 12 early AM (suggested)'
+    },
+    {
+      name: 'Tofuku-ji Temple',
+      lat: 34.9757, lng: 135.7748,
+      region: 'kyoto', category: 'Temple',
+      desc: '10-minute walk from Fushimi Inari. Less touristy with some of Kyoto\'s most beautiful Zen gardens. Bring yen coins for the entrance fee.',
+      day: 'Apr 12 (suggested)'
+    },
+    {
+      name: 'Tempura Tenyou',
+      lat: 35.0046, lng: 135.7688,
+      region: 'kyoto', category: 'Restaurant',
+      desc: 'Dinner reservation (booked by Becca). Tempura restaurant in central Kyoto.',
+      day: 'Apr 12, 6:30 PM'
+    },
+    {
+      name: 'Arashiyama Bamboo Grove',
+      lat: 35.0174, lng: 135.6726,
+      region: 'kyoto', category: 'Nature',
+      desc: 'Famous walking path through towering bamboo. Open 24 hours — magical when the wind makes stalks sway. Tip: Uber directly to "Arashiyama Bamboo Grove" or take train to Saga Arashiyama (fewer tourists than Arashiyama station).',
+      day: 'Apr 13 early AM (suggested)'
+    },
+    {
+      name: 'Tenryu-ji Temple',
+      lat: 35.0170, lng: 135.6763,
+      region: 'kyoto', category: 'Temple',
+      desc: 'UNESCO World Heritage Zen Buddhist temple in Arashiyama with a celebrated garden. Opens 8:30 AM.',
+      day: 'Apr 13 (suggested)'
+    },
+    {
+      name: 'Iwatayama Monkey Park',
+      lat: 35.0128, lng: 135.6742,
+      region: 'kyoto', category: 'Nature',
+      desc: 'Hike up to see 100+ wild Japanese macaques up close with panoramic views over Arashiyama and the Katsura River valley below. Opens 9 AM.',
+      day: 'Apr 13 (suggested)'
+    },
+    {
+      name: 'Otagi Nenbutsuji Temple',
+      lat: 35.0319, lng: 135.6631,
+      region: 'kyoto', category: 'Temple',
+      desc: "One of Kyoto's best-kept secrets — 1,200+ carved Buddha statues, each with a unique expression. Near Saga-Toriimoto preserved village with original thatched-roof Meiji-era farmhouses. Opens 9 AM.",
+      day: 'Apr 13 (suggested)'
+    },
+
+    // ── MT. FUJI ───────────────────────────────────────────────────────
+    {
+      name: 'The Sense Fuji',
+      lat: 35.4730, lng: 138.7460,
+      region: 'fuji', category: 'Hotel', isHotel: true,
+      desc: 'Exclusive terrace villa resort at the foot of Mt. Fuji (Narusawa). Private indoor onsen, private sauna, meals on terrace. Dinner Apr 14 (grill), Apr 15 (hot pot); breakfast included.',
+      day: 'Apr 14–16'
+    },
+    {
+      name: 'Mount Fuji',
+      lat: 35.3606, lng: 138.7274,
+      region: 'fuji', category: 'Nature',
+      desc: "Japan's iconic sacred peak (3,776m). Visible from The Sense Fuji, Lake Ashi, and the Hakone Ropeway on clear days.",
+      day: 'Apr 14–16'
+    },
+
+    // ── NIKKO ──────────────────────────────────────────────────────────
+    {
+      name: 'The Ritz-Carlton, Nikko',
+      lat: 36.7538, lng: 139.4820,
+      region: 'nikko', category: 'Hotel', isHotel: true,
+      desc: 'Luxury resort on Lake Chuzenji with views of Mount Nantai. IN Travel client perks: upgrade on arrival, daily breakfast, $100 resort credit, early check-in/late check-out.',
+      day: 'Apr 16–17'
+    },
+    {
+      name: 'Lake Chuzenji',
+      lat: 36.7527, lng: 139.4807,
+      region: 'nikko', category: 'Nature',
+      desc: 'Pristine mountain lake at 1,269m elevation surrounded by forested mountains. Dinner at Lakehouse on the first evening.',
+      day: 'Apr 16–17'
+    },
+    {
+      name: 'Tosho-gu Shrine, Nikko',
+      lat: 36.7581, lng: 139.5990,
+      region: 'nikko', category: 'Shrine',
+      desc: "Nikko's most celebrated landmark — an ornate 17th-century shrine complex dedicated to Tokugawa Ieyasu, founder of the Edo shogunate. UNESCO World Heritage site.",
+      day: 'Apr 17 (explore with Nikko Pass)'
+    }
+  ];
+
+  // ── MAP SETUP ─────────────────────────────────────────────────────────
+  const map = L.map('map', {
+    center: [35.8, 137.8],
+    zoom: 7,
+    zoomControl: true
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(map);
+
+  // ── ICONS ─────────────────────────────────────────────────────────────
+  function makeIcon(loc) {
+    const color = REGIONS[loc.region].color;
+    const size = loc.isHotel ? 16 : 12;
+    const radius = loc.isHotel ? '3px' : '50%';
+    const border = loc.isHotel ? '2.5px solid #fff' : '2px solid rgba(255,255,255,0.7)';
+    return L.divIcon({
+      className: '',
+      html: `<div style="
+        width:${size}px;height:${size}px;
+        background:${color};
+        border:${border};
+        border-radius:${radius};
+        box-shadow:0 2px 8px rgba(0,0,0,0.5);
+        cursor:pointer;
+      "></div>`,
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2],
+      popupAnchor: [0, -size/2 - 4]
+    });
+  }
+
+  // ── MARKERS ───────────────────────────────────────────────────────────
+  const markers = [];
+
+  LOCATIONS.forEach((loc, i) => {
+    const color = REGIONS[loc.region].color;
+    const badgeStyle = `background:${color}22;color:${color};border:1px solid ${color}44;`;
+    const hotelFlag = loc.isHotel ? ' ★' : '';
+
+    const popupHtml = `
+      <div class="popup-inner">
+        <div class="popup-badge" style="${badgeStyle}">${REGIONS[loc.region].label} · ${loc.category}</div>
+        <div class="popup-name">${loc.name}${hotelFlag}</div>
+        <div class="popup-desc">${loc.desc}</div>
+        <div class="popup-day">📅 ${loc.day}</div>
+      </div>`;
+
+    const marker = L.marker([loc.lat, loc.lng], { icon: makeIcon(loc) })
+      .addTo(map)
+      .bindPopup(popupHtml, { maxWidth: 300, closeButton: true });
+
+    markers.push({ loc, marker });
+  });
+
+  // ── SIDEBAR ───────────────────────────────────────────────────────────
+  const sidebarEl = document.getElementById('sidebarList');
+
+  function buildSidebar(filter) {
+    sidebarEl.innerHTML = '';
+    const grouped = {};
+    LOCATIONS.forEach(loc => {
+      if (filter && loc.region !== filter) return;
+      if (!grouped[loc.region]) grouped[loc.region] = [];
+      grouped[loc.region].push(loc);
+    });
+
+    const regionOrder = ['tokyo', 'hakone', 'kyoto', 'fuji', 'nikko'];
+    regionOrder.forEach(region => {
+      if (!grouped[region]) return;
+      const color = REGIONS[region].color;
+
+      const heading = document.createElement('div');
+      heading.style.cssText = `padding:8px 14px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:${color};border-top:1px solid #1a1a1a;`;
+      heading.textContent = REGIONS[region].label;
+      sidebarEl.appendChild(heading);
+
+      grouped[region].forEach(loc => {
+        const item = document.createElement('div');
+        item.className = 'sidebar-item';
+        item.innerHTML = `
+          <div class="sidebar-dot ${loc.isHotel ? 'hotel' : ''}" style="background:${color}"></div>
+          <div>
+            <div class="sidebar-item-name">${loc.name}</div>
+            <div class="sidebar-item-meta">${loc.category} · ${loc.day}</div>
+          </div>`;
+        item.addEventListener('click', () => {
+          map.setView([loc.lat, loc.lng], 15, { animate: true });
+          // find and open marker
+          markers.forEach(m => {
+            if (m.loc === loc) m.marker.openPopup();
+          });
+        });
+        sidebarEl.appendChild(item);
+      });
+    });
+  }
+
+  buildSidebar(null);
+
+  // ── FILTER ────────────────────────────────────────────────────────────
+  const REGION_VIEWS = {
+    tokyo:  { center: [35.6762, 139.7303], zoom: 12 },
+    hakone: { center: [35.2200, 139.0500], zoom: 12 },
+    kyoto:  { center: [35.0116, 135.7681], zoom: 13 },
+    fuji:   { center: [35.4200, 138.7500], zoom: 11 },
+    nikko:  { center: [36.7500, 139.4800], zoom: 13 }
+  };
+
+  let activeFilter = null;
+
+  function filterRegion(region) {
+    activeFilter = region;
+    buildSidebar(region);
+
+    markers.forEach(({ loc, marker }) => {
+      if (!region || loc.region === region) {
+        marker.addTo(map);
+      } else {
+        marker.remove();
+      }
+    });
+
+    if (region && REGION_VIEWS[region]) {
+      const v = REGION_VIEWS[region];
+      map.setView(v.center, v.zoom, { animate: true });
+    } else {
+      map.setView([35.8, 137.8], 7, { animate: true });
+    }
+
+    // update legend highlights
+    document.querySelectorAll('.legend-item').forEach(el => el.classList.remove('active'));
+    if (region) {
+      document.querySelectorAll('.legend-item').forEach(el => {
+        if (el.textContent.trim().toLowerCase() === (region === 'fuji' ? 'mt. fuji' : region)) {
+          el.classList.add('active');
+        }
+      });
+    }
+  }
+</script>
+</body>
+</html>
